@@ -2,13 +2,14 @@ package cheerio
 
 import (
 	"fmt"
-	"github.com/beyang/cheerio/util"
-	"github.com/beyang/go-version"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/beyang/cheerio/fetch"
+	"github.com/beyang/go-version"
 )
 
 var DefaultPyPI = &PackageIndex{URI: "https://pypi.python.org"}
@@ -17,6 +18,7 @@ type PackageIndex struct {
 	URI string
 }
 
+// Get names of all packages served by a PyPI server.
 func (p *PackageIndex) AllPackages() ([]string, error) {
 	pkgs := make([]string, 0)
 
@@ -74,11 +76,11 @@ func (p *PackageIndex) FetchRawMetadata(pkg string, tarPattern, eggPattern, zipP
 
 	// Get the latest version
 	if path := lastTar(files); path != "" {
-		return util.RemoteDecompress(fmt.Sprintf("%s%s", p.URI, path), tarPattern, util.Tar)
+		return fetch.RemoteDecompress(fmt.Sprintf("%s%s", p.URI, path), tarPattern, fetch.Tar)
 	} else if path := lastEgg(files); path != "" {
-		return util.RemoteDecompress(fmt.Sprintf("%s%s", p.URI, path), eggPattern, util.Zip)
+		return fetch.RemoteDecompress(fmt.Sprintf("%s%s", p.URI, path), eggPattern, fetch.Zip)
 	} else if path := lastZip(files); path != "" {
-		return util.RemoteDecompress(fmt.Sprintf("%s%s", p.URI, path), zipPattern, util.Zip)
+		return fetch.RemoteDecompress(fmt.Sprintf("%s%s", p.URI, path), zipPattern, fetch.Zip)
 	} else {
 		return nil, fmt.Errorf("[tar/zip] no tar or zip found in %+v for pkg %s", files, pkg)
 	}
@@ -86,9 +88,6 @@ func (p *PackageIndex) FetchRawMetadata(pkg string, tarPattern, eggPattern, zipP
 
 var allPkgRegexp = regexp.MustCompile(`<a href='([A-Za-z0-9\._\-]+)'>([A-Za-z0-9\._\-]+)</a><br/>`)
 var pkgFilesRegexp = regexp.MustCompile(`<a href="([/A-Za-z0-9\._\-]+)#md5=[0-9a-z]+"[^>]*>([A-Za-z0-9\._\-]+)</a><br/>`)
-var tarRegexp = regexp.MustCompile(`[/A-Za-z0-9\._\-]+\.(?:tar\.(?:gz|bz2)|tgz)`)
-var zipRegexp = regexp.MustCompile(`[/A-Za-z0-9\._\-]+\.zip`)
-var eggRegexp = regexp.MustCompile(`[/A-Za-z0-9\._\-]+\.egg`)
 var requirementRegexp = regexp.MustCompile(`(?P<package>[A-Za-z0-9\._\-]+)(?:\[([A-Za-z0-9\._\-]+)\])?\s*(?:(?P<constraint>==|>=|>|<|<=)\s*(?P<version>[A-Za-z0-9\._\-]+)(?:\s*,\s*[<>=!]+\s*[a-z0-9\.]+)?)?`)
 var reqHeaderRegexp = regexp.MustCompile(`\[[A-Za-z0-9\._\-]+\]`)
 
@@ -118,30 +117,4 @@ func (p *PackageIndex) pkgFiles(pkg string) ([]string, error) {
 	}
 
 	return files, nil
-}
-func lastTar(files []string) string {
-	for f := len(files) - 1; f >= 0; f-- {
-		if tarRegexp.MatchString(files[f]) {
-			return files[f]
-		}
-	}
-	return ""
-}
-
-func lastEgg(files []string) string {
-	for f := len(files) - 1; f >= 0; f-- {
-		if eggRegexp.MatchString(files[f]) {
-			return files[f]
-		}
-	}
-	return ""
-}
-
-func lastZip(files []string) string {
-	for f := len(files) - 1; f >= 0; f-- {
-		if zipRegexp.MatchString(files[f]) {
-			return files[f]
-		}
-	}
-	return ""
 }
